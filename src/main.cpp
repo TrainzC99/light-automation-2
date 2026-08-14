@@ -9,16 +9,22 @@ TaskHandle_t motion_detect_handle = NULL;
 
 void lamp_switch(void *parameters);
 TaskHandle_t lamp_switch_handle = NULL;
+
+void light_detect(void *parameters);
+TaskHandle_t light_detect_handle = NULL;
 	
 // Global variables
 	// LAMP
 const uint32_t lamp_pin_no = 26;
 bool lamp_state = false;
 
-  // MOTION SENSOR
+	// MOTION SENSOR
 const uint32_t motion_pin_no = 14;
-uint32_t state = LOW;
-bool once = false;
+uint32_t motion_state = LOW;
+
+	// LIGHT SENSOR
+const uint32_t light_pin_no = 27;
+uint32_t light_state = LOW;
 
 void setup() {
 	// SERIAL
@@ -27,12 +33,15 @@ void setup() {
 	// PIN
 	pinMode(lamp_pin_no, OUTPUT);
 	pinMode(motion_pin_no, INPUT);
+	pinMode(light_pin_no, INPUT);
 
 	// FREE RTOS TASK
 	xTaskCreate(motion_detect, "Detect motion",
 		1000, NULL, 1, &motion_detect_handle);
 	xTaskCreate(lamp_switch, "Switch lamp", 
 		1000, NULL, 1, &lamp_switch_handle);
+	xTaskCreate(light_detect, "Detect light",
+		1000, NULL, 1, &light_detect_handle);
 }
 
 void loop() {
@@ -42,41 +51,31 @@ void loop() {
 void motion_detect(void *parameters){
 	for(;;){
 		vTaskSuspend(lamp_switch_handle);
-		state = digitalRead(motion_pin_no);
-		Serial.println("Sensor read: " + state);
+		motion_state = digitalRead(motion_pin_no);
 		vTaskResume(lamp_switch_handle);
-		vTaskDelay( 10 / portTICK_PERIOD_MS);
+		vTaskDelay(10 / portTICK_PERIOD_MS);
 	}
 }
 
 void lamp_switch(void *parameters){
 	for(;;){
-		vTaskSuspend(motion_detect_handle);
-		digitalWrite(lamp_pin_no, state);
-		Serial.println("Lamp switched to: " + state);
-		vTaskResume(motion_detect_handle);
-		vTaskDelay( 10 / portTICK_PERIOD_MS);
+		digitalWrite(lamp_pin_no, motion_state);
+		vTaskDelay(10 / portTICK_PERIOD_MS);
 	}
 }
 
-// void motion(void)
-// {
-// 	state = digitalRead(motion_pin_no);  // read input value
-
-//   	if (state == HIGH)  // check if the input is HIGH
-// 	{            
-// 		if (once == false)  // only turn on LED if it's currently off
-// 		{
-// 			digitalWrite(led_pin_no, HIGH);
-// 			once = true;  // update ledState
-// 		}
-// 	} 
-//   	else 
-// 	{
-// 		if (once == true)  // only turn off LED if it's currently on
-// 		{
-// 			digitalWrite(led_pin_no, LOW);
-// 			once = false;  // update ledState
-// 		}
-// 	}
-// }
+void light_detect(void *parameters){
+	for(;;){
+		light_state = digitalRead(light_pin_no);
+		if(light_state == LOW){ // LOW = light
+			vTaskSuspend(motion_detect_handle);
+			vTaskSuspend(lamp_switch_handle);	
+			motion_state = LOW;
+			digitalWrite(lamp_pin_no, motion_state);
+		}else if(light_state == HIGH){ // HIGH = darkness
+			vTaskResume(motion_detect_handle);
+			vTaskResume(lamp_switch_handle);
+		}
+		vTaskDelay( 5 / portTICK_PERIOD_MS );
+	}
+}
