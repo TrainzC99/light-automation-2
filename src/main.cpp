@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <TM1637Display.h>
 
 // Preprocessor directives
 #define SEC * 1000
@@ -12,6 +13,9 @@ TaskHandle_t lamp_switch_handle = NULL;
 
 void light_detect(void *parameters);
 TaskHandle_t light_detect_handle = NULL;
+
+void display_update(void *parameters);
+TaskHandle_t display_update_handle = NULL;
 	
 // Global variables
 	// LAMP
@@ -26,6 +30,14 @@ uint32_t motion_state = LOW;
 const uint32_t light_pin_no = 27;
 uint32_t light_state = LOW;
 
+	// 4-DIGIT DISPLAY
+const uint32_t display_clock_pin_no = 33;
+const uint32_t display_dio_pin_no = 25;
+TM1637Display display = TM1637Display(display_clock_pin_no, display_dio_pin_no);
+const uint8_t allON[] = { 0xff, 0xff, 0xff, 0xff };
+const uint8_t allOFF[] = { 0x00, 0x00, 0x00, 0x00 };
+uint32_t time[2] = {0};
+
 void setup() {
 	// SERIAL
 	Serial.begin(115200);
@@ -35,6 +47,10 @@ void setup() {
 	pinMode(motion_pin_no, INPUT);
 	pinMode(light_pin_no, INPUT);
 
+	// DISPLAY
+	display.setBrightness(4);
+	display.setSegments(allON);
+
 	// FREE RTOS TASK
 	xTaskCreate(motion_detect, "Detect motion",
 		1000, NULL, 1, &motion_detect_handle);
@@ -42,6 +58,8 @@ void setup() {
 		1000, NULL, 1, &lamp_switch_handle);
 	xTaskCreate(light_detect, "Detect light",
 		1000, NULL, 1, &light_detect_handle);
+	xTaskCreate(display_update, "Update display",
+		1000, NULL, 2, &display_update_handle);
 }
 
 void loop() {
@@ -77,5 +95,19 @@ void light_detect(void *parameters){
 			vTaskResume(lamp_switch_handle);
 		}
 		vTaskDelay( 5 / portTICK_PERIOD_MS );
+	}
+}
+
+void display_update(void *parameters){
+
+	TickType_t xLastWakeTime;
+	const TickType_t xFrequency = (1 SEC) / portTICK_PERIOD_MS;
+
+	xLastWakeTime = xTaskGetTickCount();
+
+	for(;;){
+		display.showNumberDecEx(time[1] * 100 + time[2],
+			0b01000000,true,4,0);
+		vTaskDelayUntil( &xLastWakeTime, xFrequency);
 	}
 }
