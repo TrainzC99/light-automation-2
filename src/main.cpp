@@ -78,7 +78,7 @@ void setup() {
 	xTaskCreate(light_detect, "Detect light",
 		1000, NULL, 1, &light_detect_handle);
 	xTaskCreate(time_display, "Display time",
-		2000, NULL, 2, &time_display_handle);
+		2000, NULL, 1, &time_display_handle);
 	xTaskCreatePinnedToCore(connect_keep_WiFi, "Connect and keep Wi-Fi",
 		2000, NULL, 2, &connect_keep_WiFi_handle, 
 		ARDUINO_RUNNING_CORE);
