@@ -1,8 +1,11 @@
 #include <Arduino.h>
 #include <TM1637Display.h>
+#include <WiFi.h>
+#include "wificredentials.h"
 
 // Preprocessor directives
 #define SEC * 1000
+#define MIN * (60 SEC)
 
 // Function declarations
 void motion_detect(void *parameters);
@@ -16,6 +19,12 @@ TaskHandle_t light_detect_handle = NULL;
 
 void display_update(void *parameters);
 TaskHandle_t display_update_handle = NULL;
+
+void connect_keep_WiFi(void *parameters);
+TaskHandle_t connect_keep_WiFi_handle = NULL;
+
+void sync_time(void *parameters);
+TaskHandle_t sync_time_handle = NULL;
 	
 // Global variables
 	// LAMP
@@ -36,7 +45,10 @@ const uint32_t display_dio_pin_no = 25;
 TM1637Display display = TM1637Display(display_clock_pin_no, display_dio_pin_no);
 const uint8_t allON[] = { 0xff, 0xff, 0xff, 0xff };
 const uint8_t allOFF[] = { 0x00, 0x00, 0x00, 0x00 };
-uint32_t time[2] = {0};
+uint32_t timeno[2] = {0};
+
+	// WI-FI
+#define WIFI_TIMEOUT (20 SEC)
 
 void setup() {
 	// SERIAL
@@ -59,7 +71,11 @@ void setup() {
 	xTaskCreate(light_detect, "Detect light",
 		1000, NULL, 1, &light_detect_handle);
 	xTaskCreate(display_update, "Update display",
-		1000, NULL, 2, &display_update_handle);
+		2000, NULL, 2, &display_update_handle);
+	xTaskCreatePinnedToCore(connect_keep_WiFi, "Connect and keep Wi-Fi",
+		2000, NULL, 2, &connect_keep_WiFi_handle, 
+		ARDUINO_RUNNING_CORE);
+	
 }
 
 void loop() {
@@ -106,8 +122,43 @@ void display_update(void *parameters){
 	xLastWakeTime = xTaskGetTickCount();
 
 	for(;;){
-		display.showNumberDecEx(time[1] * 100 + time[2],
+		display.showNumberDecEx(timeno[0] * 100 + timeno[1],
 			0b01000000,true,4,0);
+		timeno[1]++;
+		timeno[0] = timeno[1];
 		vTaskDelayUntil( &xLastWakeTime, xFrequency);
+	}
+}
+
+void connect_keep_WiFi(void *parameters){
+	for(;;){
+		switch (WiFi.status()){
+			case WL_CONNECTED:
+				Serial.println("WiFi connected");
+				break;
+			case WL_CONNECTION_LOST:
+				Serial.println("Wifi lost");
+				break;
+			case WL_DISCONNECTED:
+				Serial.println("Wifi disconnected");
+				break;
+			case WL_CONNECT_FAILED:
+				Serial.println("Wifi connection error");
+				break;
+			case WL_NO_SSID_AVAIL:
+				Serial.println("WiFi not configured");
+			default:
+				Serial.println("Unknown WiFi status");
+				break;
+		}
+
+		if(WiFi.status() != WL_CONNECTED){
+			WiFi.mode(WIFI_STA);
+			WiFi.begin(WIFI_NETWORK, WIFI_PASSWORD);
+			vTaskDelay((10 SEC) / portTICK_PERIOD_MS);
+		}
+		else if(WiFi.status() == WL_CONNECTED){
+			vTaskDelay((30 MIN) / portTICK_PERIOD_MS);
+		}
 	}
 }
