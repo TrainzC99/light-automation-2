@@ -1,11 +1,15 @@
 #include <Arduino.h>
 #include <TM1637Display.h>
 #include <WiFi.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
 #include "wificredentials.h"
 
 // Preprocessor directives
 #define SEC * 1000
 #define MIN * (60 SEC)
+#define H * (60 MIN)
+#define DAY * (24 H)
 
 // Function declarations
 void motion_detect(void *parameters);
@@ -17,15 +21,12 @@ TaskHandle_t lamp_switch_handle = NULL;
 void light_detect(void *parameters);
 TaskHandle_t light_detect_handle = NULL;
 
-void display_update(void *parameters);
-TaskHandle_t display_update_handle = NULL;
-
 void connect_keep_WiFi(void *parameters);
 TaskHandle_t connect_keep_WiFi_handle = NULL;
 
-void sync_time(void *parameters);
-TaskHandle_t sync_time_handle = NULL;
-	
+void time_display(void *parameters);
+TaskHandle_t time_display_handle = NULL;
+
 // Global variables
 	// LAMP
 const uint32_t lamp_pin_no = 26;
@@ -45,10 +46,13 @@ const uint32_t display_dio_pin_no = 25;
 TM1637Display display = TM1637Display(display_clock_pin_no, display_dio_pin_no);
 const uint8_t allON[] = { 0xff, 0xff, 0xff, 0xff };
 const uint8_t allOFF[] = { 0x00, 0x00, 0x00, 0x00 };
-uint32_t timeno[2] = {0};
+uint32_t numbers[2] = {0};
 
-	// WI-FI
-#define WIFI_TIMEOUT (20 SEC)
+	// SYNC TIME - NTP CLIENT
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP);
+// uint32_t splitT = 0;
+// String clocktime;
 
 void setup() {
 	// SERIAL
@@ -63,6 +67,9 @@ void setup() {
 	display.setBrightness(4);
 	display.setSegments(allON);
 
+	//TIME 
+	timeClient.setTimeOffset(7200);
+
 	// FREE RTOS TASK
 	xTaskCreate(motion_detect, "Detect motion",
 		1000, NULL, 1, &motion_detect_handle);
@@ -70,12 +77,11 @@ void setup() {
 		1000, NULL, 1, &lamp_switch_handle);
 	xTaskCreate(light_detect, "Detect light",
 		1000, NULL, 1, &light_detect_handle);
-	xTaskCreate(display_update, "Update display",
-		2000, NULL, 2, &display_update_handle);
+	xTaskCreate(time_display, "Display time",
+		2000, NULL, 2, &time_display_handle);
 	xTaskCreatePinnedToCore(connect_keep_WiFi, "Connect and keep Wi-Fi",
 		2000, NULL, 2, &connect_keep_WiFi_handle, 
 		ARDUINO_RUNNING_CORE);
-	
 }
 
 void loop() {
@@ -114,22 +120,6 @@ void light_detect(void *parameters){
 	}
 }
 
-void display_update(void *parameters){
-
-	TickType_t xLastWakeTime;
-	const TickType_t xFrequency = (1 SEC) / portTICK_PERIOD_MS;
-
-	xLastWakeTime = xTaskGetTickCount();
-
-	for(;;){
-		display.showNumberDecEx(timeno[0] * 100 + timeno[1],
-			0b01000000,true,4,0);
-		timeno[1]++;
-		timeno[0] = timeno[1];
-		vTaskDelayUntil( &xLastWakeTime, xFrequency);
-	}
-}
-
 void connect_keep_WiFi(void *parameters){
 	for(;;){
 		switch (WiFi.status()){
@@ -153,12 +143,38 @@ void connect_keep_WiFi(void *parameters){
 		}
 
 		if(WiFi.status() != WL_CONNECTED){
+			// TODO: this might fail upon network reconnect whilst a run (TEST)
 			WiFi.mode(WIFI_STA);
 			WiFi.begin(WIFI_NETWORK, WIFI_PASSWORD);
-			vTaskDelay((10 SEC) / portTICK_PERIOD_MS);
+			vTaskDelay((5 SEC) / portTICK_PERIOD_MS);
 		}
 		else if(WiFi.status() == WL_CONNECTED){
 			vTaskDelay((30 MIN) / portTICK_PERIOD_MS);
 		}
+	}
+}
+
+void time_display(void *parameters){
+
+	TickType_t xLastWakeTime;
+    const TickType_t xFrequency = (1 MIN) / portTICK_PERIOD_MS;
+
+	xLastWakeTime = xTaskGetTickCount();
+
+	for(;;){
+		if (WiFi.status() != WL_CONNECTED){
+			vTaskDelayUntil( &xLastWakeTime, (5 SEC) / portTICK_PERIOD_MS);
+		}
+
+		// if the display is triggered before 60 sec i.e. default interval
+		if(!timeClient.update()){
+			timeClient.forceUpdate();
+		}
+
+		numbers[0] = timeClient.getHours();
+		numbers[1] = timeClient.getMinutes();
+		display.showNumberDecEx(numbers[0] * 100 + numbers[1],
+			0b01000000,true,4,0);
+		vTaskDelayUntil( &xLastWakeTime, xFrequency );
 	}
 }
