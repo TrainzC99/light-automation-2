@@ -243,14 +243,15 @@ void time_display(void *parameters)
 		display.showNumberDecEx(numbers[0] * 100 + numbers[1],
 								0b01000000, true, 4, 0);
 		vTaskDelayUntil(&xLastWakeTime, xFrequency);
-		if (timeClient.getHours() == 1 && WiFi.status() == WL_CONNECTED)
-		{
-			timeClient.forceUpdate();
+		timeClient.forceUpdate();
+		// if (timeClient.getHours() == 1 && WiFi.status() == WL_CONNECTED)
+		// {
+		// 	timeClient.forceUpdate();
 			// numbers[0] = timeClient.getHours();
 			// numbers[1] = timeClient.getMinutes();
 			// rtc.adjust(DateTime(now.year(), now.month(), now.day(),
 			// 					numbers[0], numbers[1], timeClient.getSeconds()));
-		}
+		// }
 		// now = rtc.now();
 		// numbers[0] = now.hour();
 		// numbers[1] = now.minute();
