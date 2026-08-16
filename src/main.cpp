@@ -214,20 +214,8 @@ void time_display(void *parameters)
 		{
 			i--;
 		}
-		// Serial.println(numbers[0] * 10000 + numbers[1] * 100 + timeClient.getSeconds());
 	}
 
-	// Update RTC clock
-	// rtc.adjust(DateTime(2000, 8, 16,
-	// 					numbers[0], numbers[1], timeClient.getSeconds()));
-	// Serial.println("Update RTC!");
-
-	// // Sync with next minute
-	// while (rtc.now().second() != 0)
-	// {
-	// 	vTaskDelayUntil(&xLastWakeTime, (1 SEC) / portTICK_PERIOD_MS);
-	// }
-	// Serial.println("At minute!");
 	// Sync with next minute
 	while (timeClient.getSeconds() != 0)
 	{
@@ -244,28 +232,5 @@ void time_display(void *parameters)
 								0b01000000, true, 4, 0);
 		vTaskDelayUntil(&xLastWakeTime, xFrequency);
 		timeClient.forceUpdate();
-		// if (timeClient.getHours() == 1 && WiFi.status() == WL_CONNECTED)
-		// {
-		// 	timeClient.forceUpdate();
-			// numbers[0] = timeClient.getHours();
-			// numbers[1] = timeClient.getMinutes();
-			// rtc.adjust(DateTime(now.year(), now.month(), now.day(),
-			// 					numbers[0], numbers[1], timeClient.getSeconds()));
-		// }
-		// now = rtc.now();
-		// numbers[0] = now.hour();
-		// numbers[1] = now.minute();
-		// display.showNumberDecEx(numbers[0] * 100 + numbers[1],
-		// 						0b01000000, true, 4, 0);
-		// Serial.println("Clock update from RTC!");
-		// vTaskDelayUntil(&xLastWakeTime, xFrequency);
-		// if (now.dayOfTheWeek() == 1 && WiFi.status() == WL_CONNECTED)
-		// {
-		// 	timeClient.forceUpdate();
-		// 	numbers[0] = timeClient.getHours();
-		// 	numbers[1] = timeClient.getMinutes();
-		// 	rtc.adjust(DateTime(now.year(), now.month(), now.day(),
-		// 						numbers[0], numbers[1], timeClient.getSeconds()));
-		// }
 	}
 }
