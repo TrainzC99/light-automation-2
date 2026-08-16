@@ -231,6 +231,9 @@ void time_display(void *parameters)
 		display.showNumberDecEx(numbers[0] * 100 + numbers[1],
 								0b01000000, true, 4, 0);
 		vTaskDelayUntil(&xLastWakeTime, xFrequency);
-		timeClient.forceUpdate();
+		if (!timeClient.update())
+		{
+			timeClient.forceUpdate();
+		}
 	}
 }
