@@ -82,6 +82,7 @@ void setup()
 
 	// NTP & RTC TIME
 	timeClient.setTimeOffset(10800);
+
 	if (!rtc.begin())
 	{
 		Serial.println("PCF8563 module not found!");
@@ -181,6 +182,17 @@ void connect_keep_WiFi(void *parameters)
 		else if (WiFi.status() == WL_CONNECTED)
 		{
 			vTaskDelay((30 MIN) / portTICK_PERIOD_MS);
+
+			// Every Wi-di check
+			// sync time and update RTC
+			if (!timeClient.update())
+			{
+				timeClient.forceUpdate();
+			}
+			rtc.adjust(DateTime(2000, 8, 1,
+								timeClient.getHours(),
+								timeClient.getMinutes(),
+								timeClient.getSeconds()));
 		}
 	}
 }
@@ -223,17 +235,20 @@ void time_display(void *parameters)
 		timeClient.forceUpdate();
 	}
 
+	// Update RTC with current time
+	rtc.adjust(DateTime(2000, 8, 1,
+						timeClient.getHours(),
+						timeClient.getMinutes(),
+						timeClient.getSeconds()));
+
 	// Update clock per minute
 	for (;;)
 	{
-		numbers[0] = timeClient.getHours();
-		numbers[1] = timeClient.getMinutes();
+		now = rtc.now();
+		numbers[0] = now.hour();
+		numbers[1] = now.minute();
 		display.showNumberDecEx(numbers[0] * 100 + numbers[1],
 								0b01000000, true, 4, 0);
 		vTaskDelayUntil(&xLastWakeTime, xFrequency);
-		if (!timeClient.update())
-		{
-			timeClient.forceUpdate();
-		}
 	}
 }
